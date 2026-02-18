@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from extensions import db
 from models import Order, OrderItem, MenuItem, Restaurant
 from datetime import datetime
+from flask_jwt_extended import jwt_required
+
 
 order_bp = Blueprint('order_bp', __name__)
 
@@ -35,7 +37,7 @@ def create_order():
         menu_item = MenuItem.query.get(item['menu_item_id'])
 
         if not menu_item:
-            return jsonify({"error": "Invaalid menu item"}), 400
+            return jsonify({"error": "Invalid menu item"}), 400
         
         quality = item['quantity']
         subtotal = menu_item.price * quality
@@ -72,6 +74,7 @@ def create_order():
 
 
 @order_bp.route('/orders/<int:restaurant_id>', methods=['GET'])
+@jwt_required()
 def get_orders(restaurant_id):
     orders = Order.query.filter_by(restaurant_id=restaurant_id).order_by(Order.created_at.desc()).all()
 
@@ -89,7 +92,7 @@ def get_orders(restaurant_id):
     return jsonify(result)
 
 
-@order_bp.route('/order/update_status/<int:order_id>', methods=['PUT'])
+@order_bp.route('/order/update_status/<int:order_id>', methods=['PUT']) 
 def update_order_status(order_id):
     data = request.json
     new_status = data.get('status')
