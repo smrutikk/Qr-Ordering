@@ -34,7 +34,7 @@ def login():
     if not owner or not owner.check_password(data["password"]):
         return jsonify({"message": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=owner.id)
+    access_token = create_access_token(identity=str(owner.id))
 
     return jsonify({
         "message": "Login successful",
