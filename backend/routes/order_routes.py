@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from extensions import db
-from models import Order, OrderItem, MenuItem, Restaurant
+from models import Order, OrderItem, MenuItem, Restaurant, Table
 from datetime import datetime
 from flask_jwt_extended import jwt_required
 
@@ -20,6 +20,14 @@ def create_order():
 
     if not restaurant_id or not table_id or not items:
         return jsonify({"error": "All fields required"}), 400
+
+    restaurant = Restaurant.query.get(restaurant_id)
+    if not restaurant:
+        return jsonify({"error": "Restaurant not found"}), 404
+
+    table = Table.query.get(table_id)
+    if not table or table.restaurant_id != restaurant_id:
+        return jsonify({"error": "Invalid table for this restaurant"}), 400
     
     new_order = Order(
         restaurant_id=restaurant_id,
@@ -39,14 +47,14 @@ def create_order():
         if not menu_item:
             return jsonify({"error": "Invalid menu item"}), 400
         
-        quality = item['quantity']
-        subtotal = menu_item.price * quality
+        quantity = item['quantity']
+        subtotal = menu_item.price * quantity
         total_amount += subtotal
 
         order_item = OrderItem(
             order_id=new_order.id,
             menu_item_id=menu_item.id,
-            quantity=quality,
+            quantity=quantity,
             item_price=menu_item.price,
             subtotal=subtotal
         )
@@ -54,8 +62,6 @@ def create_order():
         db.session.add(order_item)
 
     new_order.total_amount = total_amount
-
-    restaurant = Restaurant.query.get(restaurant_id)
 
     upi_link = generate_upi_link(
         restaurant.upi_id, 
@@ -86,7 +92,18 @@ def get_orders(restaurant_id):
             "table_id": order.table_id,
             "status": order.status,
             "total_amount": order.total_amount,
-            "created_at": order.created_at
+            "created_at": order.created_at,
+            "items": [
+                {
+                    "id": item.id,
+                    "menu_item_id": item.menu_item_id,
+                    "name": item.menu_item.name if item.menu_item else "Unknown item",
+                    "price": item.item_price,
+                    "quantity": item.quantity,
+                    "subtotal": item.subtotal
+                }
+                for item in order.items
+            ]
         })
 
     return jsonify(result)
@@ -95,7 +112,7 @@ def get_orders(restaurant_id):
 @order_bp.route('/order/update_status/<int:order_id>', methods=['PUT']) 
 def update_order_status(order_id):
     data = request.json
-    new_status = data.get('status')
+    new_status = (data.get('status') or "").upper()
 
     valid_statuses = ['CREATED', 'PREPARING', 'READY', 'SERVED', 'CANCELLED']
 

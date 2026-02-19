@@ -49,3 +49,31 @@ def create_table():
     db.session.commit()
 
     return jsonify({"message": "Table created"})
+
+# Get all tables for a restaurant
+@restaurant_bp.route('/tables/<int:restaurant_id>', methods=['GET'])
+def get_tables(restaurant_id):
+    tables = Table.query.filter_by(restaurant_id=restaurant_id).all()
+
+    result = []
+    for table in tables:
+        result.append({
+            "id": table.id,
+            "table_number": table.table_number,
+            "restaurant_id": table.restaurant_id
+        })
+
+    return jsonify(result), 200
+
+# Delete table
+@restaurant_bp.route('/table/<int:table_id>', methods=['DELETE'])
+def delete_table(table_id):
+    table = Table.query.get(table_id)
+
+    if not table:
+        return jsonify({"error": "Table not found"}), 404
+
+    db.session.delete(table)
+    db.session.commit()
+
+    return jsonify({"message": "Table deleted successfully"}), 200
